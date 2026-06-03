@@ -85,11 +85,11 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
 .badge.e{background:var(--elbg);color:var(--elec);}
 
 /* MEMBER ROWS */
-.member-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);}
+.member-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);}
 .member-row:last-child{border-bottom:none;}
-.member-info{display:flex;align-items:center;gap:9px;}
-.avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;}
-.member-name{font-size:14px;font-weight:600;}
+.member-info{display:flex;align-items:center;gap:7px;}
+.avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;}
+.member-name{font-size:13px;font-weight:600;}
 .member-sub{font-size:10px;color:var(--muted);margin-top:2px;}
 .type-tag{display:inline-block;padding:1px 6px;border-radius:7px;font-size:9px;font-weight:600;margin-bottom:2px;}
 .type-tag.em{background:var(--bbg);color:var(--blue);}
@@ -323,9 +323,9 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
     <div class="info-box">
       <div class="info-title">📋 توضيح بشأن ميزانية الشاليه</div>
       <div class="info-body" id="infoBody">
-        <div class="info-item"><span class="info-dot">◆</span><span>أضف النص التوضيحي هنا من الكود — مثل: من يحول لأي حساب، وفكرة كل صندوق، وطريقة توزيع الاشتراكات.</span></div>
-        <div class="info-item"><span class="info-dot">◆</span><span>عايشة وفاطمة (جزء) يحولون لحساب الطوارئ.</span></div>
-        <div class="info-item"><span class="info-dot">◆</span><span>البراء وفاطمة (جزء) وبلقيس وعبدالله يحولون لحساب المصاريف.</span></div>
+        <div class="info-item"><span class="info-dot">◆</span><span>صندوق الطوارئ: عايشة (12 دينار) — فاطمة (6 دينار)</span></div>
+        <div class="info-item"><span class="info-dot">◆</span><span>صندوق المصاريف الشهرية: البراء وبلقيس وعبدالله، كل واحد (12 دينار) — فاطمة (6 دينار)</span></div>
+        <div class="info-item"><span class="info-dot">◆</span><span>إجمالي التحصيل الشهري: 60 دينار (42 مصاريف + 18 طوارئ)</span></div>
       </div>
     </div>
   </div>
@@ -353,6 +353,14 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
       </div>
 
       <button class="btn-full" onclick="openPayModal()">✓ سجّل دفعة</button>
+
+      <!-- جدول دفعات الجلسة -->
+      <div id="sessionLog" class="hidden" style="margin-top:14px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">✅ دفعات هذه الجلسة</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <tbody id="sessionLogBody"></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
@@ -400,33 +408,40 @@ const TYC={عايشة:'em',البراء:'exp',فاطمة:'mix',بلقيس:'exp',
 const FB={'مصاريف':'g','طوارئ':'b','كهرباء':'e'};
 
 let D=null, isAdmin=false, pin='', pendingAction=null;
-// قائمة محلية للدفعات المسجّلة في هذه الجلسة — لا تُمسح بالـ loadData
-const localPaid = {}; // key: "name|month" → بيانات الدفعة
+// قائمة دفعات الجلسة — لا تُمسح بالـ loadData
+const localPaid = {};
 
-// ========== DATA ==========
+function addToSessionLog(name, month, date){
+  const log = document.getElementById('sessionLog');
+  const body = document.getElementById('sessionLogBody');
+  if(!body) return;
+  log.classList.remove('hidden');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td style="padding:6px 0;border-bottom:1px solid var(--border);font-weight:600">${name}</td>
+    <td style="padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px">${month}</td>
+    <td style="padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;direction:ltr;text-align:left">${date}</td>`;
+  body.insertBefore(tr, body.firstChild);
+}
+
 function mergeLocalPaid(){
-  // ادمج القائمة المحلية فوق بيانات الشيت — تأخذ الأولوية دائماً
-  if(!D||!D.payments) return;
+  if(!D) return;
   Object.keys(localPaid).forEach(key=>{
-    const [name,month]=key.split('|');
-    if(month===D.currentMonth){
-      D.payments[name]=localPaid[key];
-    }
-    // للأرشيف
-    if(D.archive&&D.archive[month]){
-      if(!D.archive[month].payments) D.archive[month].payments={};
-      D.archive[month].payments[name]=localPaid[key];
+    const [name, month] = key.split('|');
+    if(month === D.currentMonth){
+      if(!D.payments) D.payments = {};
+      D.payments[name] = localPaid[key];
     }
   });
 }
 
+// ========== DATA ==========
 async function loadData(){
   ss('L','يحمّل...');
   try{
     const r=await fetch(API+'?action=data&t='+Date.now());
     D=await r.json();
     if(!D.ok) throw new Error(D.error);
-    mergeLocalPaid(); // دمج القائمة المحلية قبل الرندر
+    mergeLocalPaid(); // دمج دفعات الجلسة فوق بيانات الشيت
     render();
     ss('ok','متزامن');
   }catch(e){ss('E','خطأ');toast('تعذّر الاتصال',1);}
@@ -438,10 +453,7 @@ async function apiCall(params){
   try{
     const j=await(await fetch(API+'?'+params+'&t='+Date.now())).json();
     if(!j.ok){toast(j.error,1);ss('E','خطأ');return false;}
-    toast(j.message);
-    // بعد الحفظ نحمّل البيانات لكن القائمة المحلية ستحمي التحديث
-    await loadData();
-    return true;
+    toast(j.message);await loadData();return true;
   }catch(e){toast('تعذّر الحفظ',1);ss('E','خطأ');return false;}
 }
 
@@ -478,7 +490,7 @@ function renderPayments(){
           <div class="member-name">${m}</div>
           <span class="type-tag ${TYC[m]}">${TYL[m]}</span>
           <div class="member-sub" style="${!paid?'color:var(--red)':''}">
-            ${paid?`دفع ${dt} · 12 د`:'لم يدفع بعد'}</div>
+            ${paid?`دفع ${dt} · 12 د`:''}</div>
         </div>
       </div>
       <button class="pay-btn ${bc}" ${paid?'disabled':''} onclick="openPayModalFor('${m}')">
@@ -527,7 +539,7 @@ function renderWithdrawals(){
   const tb=document.getElementById('wdTableBody');
   if(!ws.length){tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">لا توجد سحوبات</td></tr>';return;}
   tb.innerHTML=[...ws].reverse().map(w=>`<tr>
-    <td>${w.date}</td>
+    <td>${String(w.date).split(' ')[0]}</td>
     <td style="font-weight:700;color:var(--red)">${w.amount} د</td>
     <td><span class="badge ${FB[w.fund]||'y'}">${w.fund}</span></td>
     <td>${w.reason}</td>
@@ -594,7 +606,7 @@ async function doPay(name){
   const month=document.getElementById('payMonth').value;
   const key=name+'|'+month;
 
-  // تحقق من التكرار — محلي أولاً
+  // تحقق من التكرار — محلي أولاً ثم من البيانات
   const mp=month===D.currentMonth
     ?D.payments||{}
     :(D.archive&&D.archive[month]?D.archive[month].payments||{}:{});
@@ -606,20 +618,24 @@ async function doPay(name){
 
   closeModal('payModal');
 
-  // سجّل فوراً في القائمة المحلية الدائمة
+  // سجّل في القائمة المحلية الدائمة
   const now=new Date();
   const dd=String(now.getDate()).padStart(2,'0');
   const mm2=String(now.getMonth()+1).padStart(2,'0');
+  const timeStr=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   const dateStr=dd+'/'+mm2+'/'+now.getFullYear();
   const FUNDS={عايشة:{مصاريف:0,طوارئ:12},البراء:{مصاريف:12,طوارئ:0},فاطمة:{مصاريف:6,طوارئ:6},بلقيس:{مصاريف:12,طوارئ:0},عبدالله:{مصاريف:12,طوارئ:0}};
   localPaid[key]=Object.assign({},FUNDS[name]||{مصاريف:12,طوارئ:0},{date:dateStr});
 
-  // حدّث الواجهة فوراً ونهائياً
+  // حدّث الواجهة فوراً
   if(month===D.currentMonth){
     if(!D.payments) D.payments={};
     D.payments[name]=localPaid[key];
     renderPayments();
   }
+
+  // أضف لجدول الجلسة
+  addToSessionLog(name, month, dateStr+' '+timeStr);
 
   // أرسل للشيت في الخلفية
   await apiCall('action=pay&name='+enc(name)+'&month='+enc(month));
