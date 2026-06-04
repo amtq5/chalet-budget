@@ -216,7 +216,7 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
     <button class="tab" onclick="sw('payments')">الدفعات</button>
     <button class="tab" onclick="sw('wd')">السحوبات</button>
     <button class="tab" onclick="sw('elec')">الكهرباء</button>
-    <button class="tab" onclick="sw('archive')">الأرشيف</button>
+
   </div>
 </div>
 
@@ -266,12 +266,18 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
         <div id="slogBody"></div>
       </div>
     </div>
+
+    <!-- أرشيف الأشهر السابقة داخل الدفعات -->
+    <div class="card" style="margin-top:0">
+      <div class="card-title">الأشهر السابقة</div>
+      <div id="archList"></div>
+    </div>
   </div>
 
   <!-- السحوبات -->
   <div id="tab-wd" class="hidden">
     <div class="card" style="text-align:center;margin-bottom:11px;background:var(--bbg);border-color:rgba(61,107,143,.25)">
-      <div style="font-size:11px;font-weight:600;color:var(--blue);margin-bottom:6px">إجمالي السحوبات</div>
+      <div style="font-size:11px;font-weight:600;color:var(--blue);margin-bottom:6px">إجمالي السحوبات من صندوق الطوارئ</div>
       <div style="font-size:28px;font-weight:700;color:var(--blue)" id="wdTotal">—</div>
       <div style="font-size:11px;color:var(--muted)">دينار</div>
     </div>
@@ -292,13 +298,7 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
     </div>
   </div>
 
-  <!-- الأرشيف -->
-  <div id="tab-archive" class="hidden">
-    <div class="card">
-      <div class="card-title">أرشيف الأشهر السابقة</div>
-      <div id="archList"></div>
-    </div>
-  </div>
+
 
 </div>
 
@@ -306,8 +306,8 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
 const API='https://script.google.com/macros/s/AKfycbwXlHxusCm1foNXAAHM9AOTdio5smfsKTWmkSgV2eRInwN9UlYWJGWaBTIEboMmalTK/exec';
 const PIN='1234';
 // ← عدّل الآيبانات هنا:
-const IBAN_EXP='SA00 0000 0000 0000 0000 0000';
-const IBAN_EM ='SA00 0000 0000 0000 0000 0000';
+const IBAN_EXP='BH95ALSA00694347151002';
+const IBAN_EM ='BH75ALSA00694347150101';
 
 const MEMBERS=['عايشة','البراء','فاطمة','بلقيس','عبدالله'];
 const AVT={عايشة:'#3d6b8f',البراء:'#4a7c59',فاطمة:'#8b4760',بلقيس:'#8b6f47',عبدالله:'#5a6b3d'};
@@ -490,7 +490,8 @@ function openPayMo(){openPayFor(null);}
 function openPayFor(name){
   if(!D) return;
   const sel=document.getElementById('payMonth');
-  sel.innerHTML=(D.allMonths||[]).map(m=>`<option value="${m}" ${m===D.currentMonth?'selected':''}>${m}</option>`).join('');
+  const months=D&&D.allMonths&&D.allMonths.length?D.allMonths:[D&&D.currentMonth||'يونيو 2026'];
+  sel.innerHTML=months.map(m=>`<option value="${m}" ${m===(D&&D.currentMonth)?'selected':''}>${m}</option>`).join('');
   buildNames(name);
   document.getElementById('payMo').classList.remove('hidden');
 }
@@ -560,7 +561,8 @@ function openAdmin(){
   if(!D) return;
   document.getElementById('aOpenEm').value=D.settings?.openEm||0;
   const sel=document.getElementById('aElecMonth');
-  sel.innerHTML=(D.allMonths||[]).map(m=>`<option value="${m}" ${m===D.currentMonth?'selected':''}>${m}</option>`).join('');
+  const months=D&&D.allMonths&&D.allMonths.length?D.allMonths:[D&&D.currentMonth||'يونيو 2026'];
+  sel.innerHTML=months.map(m=>`<option value="${m}" ${m===(D&&D.currentMonth)?'selected':''}>${m}</option>`).join('');
   document.getElementById('adminMo').classList.remove('hidden');
 }
 async function saveSettings(){
@@ -591,7 +593,7 @@ function copyIban(id,btn){
 // ===== UTILS =====
 function cm(id){document.getElementById(id).classList.add('hidden');}
 function sw(tab){
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['home','payments','wd','elec','archive'][i]===tab));
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['home','payments','wd','elec'][i]===tab));
   document.querySelectorAll('[id^="tab-"]').forEach(el=>el.classList.add('hidden'));
   document.getElementById('tab-'+tab).classList.remove('hidden');
 }
