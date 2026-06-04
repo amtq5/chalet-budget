@@ -192,6 +192,17 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
       <input class="mi2" type="number" id="aPaid" placeholder="المدفوع (د)" step="0.5">
     </div>
     <button class="md-ok" onclick="saveElec()">💡 حفظ فاتورة الكهرباء</button>
+    <div class="divider"></div>
+    <div class="md-sec">إضافة دفع طوارئ شهري</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">المعتاد: 18 د شهرياً (عايشة 12 + فاطمة 6)</div>
+    <select class="ms2" id="aEmMonth"></select>
+    <input class="mi2" type="number" id="aEmAmt" placeholder="المبلغ الإجمالي (د) — المعتاد 18" step="0.5">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">من دفع؟</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px" id="emPayersList">
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="emAysha" checked> عايشة (12 د)</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="emFatima" checked> فاطمة (6 د)</label>
+    </div>
+    <button class="md-ok" style="background:var(--blue);color:#fff" onclick="doEmMonthly()">➕ إضافة دفع الطوارئ الشهري</button>
     <button class="md-cancel" onclick="cm('adminMo');isAdmin=false;updAdmin()">تسجيل الخروج</button>
   </div>
 </div>
@@ -214,7 +225,7 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
   <div class="tabs">
     <button class="tab active" onclick="sw('home')">الرئيسية</button>
     <button class="tab" onclick="sw('payments')">الدفعات</button>
-    <button class="tab" onclick="sw('wd')">السحوبات</button>
+    <button class="tab" onclick="sw('wd')">صندوق الطوارئ</button>
     <button class="tab" onclick="sw('elec')">الكهرباء</button>
 
   </div>
@@ -224,12 +235,6 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
 
   <!-- الرئيسية -->
   <div id="tab-home">
-    <div class="em-box">
-      <div class="em-label">💙 صندوق الطوارئ</div>
-      <div class="em-amount" id="balEm">—</div>
-      <div class="em-unit">دينار</div>
-    </div>
-
     <div class="iban-grid">
       <div class="iban-box">
         <div class="iban-name">💚 حساب المصاريف</div>
@@ -274,11 +279,16 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
     </div>
   </div>
 
-  <!-- السحوبات -->
+  <!-- صندوق الطوارئ -->
   <div id="tab-wd" class="hidden">
-    <div class="card" style="text-align:center;margin-bottom:11px;background:var(--bbg);border-color:rgba(61,107,143,.25)">
-      <div style="font-size:11px;font-weight:600;color:var(--blue);margin-bottom:6px">إجمالي السحوبات من صندوق الطوارئ</div>
-      <div style="font-size:28px;font-weight:700;color:var(--blue)" id="wdTotal">—</div>
+    <div class="em-box" style="margin-bottom:11px">
+      <div class="em-label">💙 رصيد صندوق الطوارئ</div>
+      <div class="em-amount" id="balEm">—</div>
+      <div class="em-unit">دينار</div>
+    </div>
+    <div class="card" style="text-align:center;margin-bottom:11px;background:var(--rbg);border-color:rgba(184,84,80,.2)">
+      <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:6px">إجمالي السحوبات من صندوق الطوارئ</div>
+      <div style="font-size:28px;font-weight:700;color:var(--red)" id="wdTotal">—</div>
       <div style="font-size:11px;color:var(--muted)">دينار</div>
     </div>
     <div class="card">
@@ -309,6 +319,7 @@ const PIN='1234';
 const IBAN_EXP='BH95ALSA00694347151002';
 const IBAN_EM ='BH75ALSA00694347150101';
 
+const MONTHS_AR=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 const MEMBERS=['عايشة','البراء','فاطمة','بلقيس','عبدالله'];
 const AVT={عايشة:'#3d6b8f',البراء:'#4a7c59',فاطمة:'#8b4760',بلقيس:'#8b6f47',عبدالله:'#5a6b3d'};
 const TYL={عايشة:'طوارئ',البراء:'مصاريف',فاطمة:'م+ط',بلقيس:'مصاريف',عبدالله:'مصاريف'};
@@ -318,7 +329,8 @@ const FUNDS={عايشة:{طوارئ:12,مصاريف:0},البراء:{طوارئ:
 let D=null, isAdmin=false, pin='', pendingAction=null;
 
 // ===== قائمة الجلسة — محفوظة في localStorage =====
-const SESSION_KEY='chalet_session_'+new Date().toDateString();
+const now0=new Date();
+const SESSION_KEY='chalet_session_'+now0.getFullYear()+'_'+now0.getMonth();
 function getSessionLog(){try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'[]');}catch(e){return[];}}
 function addToSession(name,month,time){
   const log=getSessionLog();
@@ -429,7 +441,7 @@ function renderWithdrawals(){
   const tb=document.getElementById('wdBody');
   if(!ws.length){tb.innerHTML='<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px">لا توجد سحوبات</td></tr>';return;}
   tb.innerHTML=[...ws].reverse().map(w=>`<tr>
-    <td>${w.date}</td>
+    <td>${String(w.date).split(' ')[0]}</td>
     <td style="font-weight:700;color:var(--red)">${w.amount} د</td>
     <td>${w.reason}</td>
   </tr>`).join('');
@@ -442,7 +454,9 @@ function renderElec(){
   // تجميع حسب السنة
   const byYear={};
   list.forEach(r=>{
-    const yr=r.month.split(' ')[1]||'—';
+    const mStr=r.month instanceof Date?MONTHS_AR[r.month.getMonth()]+' '+r.month.getFullYear():String(r.month).trim();
+    r.month=mStr;
+    const yr=mStr.split(' ')[1]||'—';
     if(!byYear[yr]) byYear[yr]=[];
     byYear[yr].push(r);
   });
@@ -563,6 +577,7 @@ function openAdmin(){
   const sel=document.getElementById('aElecMonth');
   const months=D&&D.allMonths&&D.allMonths.length?D.allMonths:[D&&D.currentMonth||'يونيو 2026'];
   sel.innerHTML=months.map(m=>`<option value="${m}" ${m===(D&&D.currentMonth)?'selected':''}>${m}</option>`).join('');
+  initEmMonthSel();
   document.getElementById('adminMo').classList.remove('hidden');
 }
 async function saveSettings(){
@@ -579,6 +594,33 @@ async function saveElec(){
   const inv=g('aInvoice'),paid=g('aPaid');
   if(!inv||!paid){toast('أدخل الفاتورة والمدفوع',1);return;}
   await apiCall('action=elec&month='+enc(month)+'&invoice='+inv+'&paid='+paid);
+}
+
+// ===== EMERGENCY MONTHLY =====
+function initEmMonthSel(){
+  if(!D) return;
+  const sel=document.getElementById('aEmMonth');
+  if(!sel) return;
+  const months=D.allMonths||[D.currentMonth];
+  sel.innerHTML=months.map(m=>`<option value="${m}" ${m===D.currentMonth?'selected':''}>${m}</option>`).join('');
+}
+async function doEmMonthly(){
+  const month=document.getElementById('aEmMonth').value;
+  const amt=parseFloat(g('aEmAmt'));
+  const aysha=document.getElementById('emAysha').checked;
+  const fatima=document.getElementById('emFatima').checked;
+  if(!amt||amt<=0){toast('أدخل المبلغ',1);return;}
+  if(!aysha&&!fatima){toast('اختر شخصاً على الأقل',1);return;}
+  let ok=true;
+  if(aysha){
+    const r=await apiCall('action=pay&name='+enc('عايشة')+'&month='+enc(month));
+    if(!r) ok=false;
+  }
+  if(fatima){
+    const r=await apiCall('action=pay&name='+enc('فاطمة')+'&month='+enc(month));
+    if(!r) ok=false;
+  }
+  if(ok) toast('✅ تم تسجيل دفعات الطوارئ الشهرية');
 }
 
 // ===== IBAN =====
